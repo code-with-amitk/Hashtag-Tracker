@@ -116,7 +116,8 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5433/hashtag_tracker
 | `npm run dev` | Start dev server with hot reload (local) |
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm start` | Run compiled output (local) |
-| `npm test` | Run unit tests |
+| `npm test` | Run unit and integration tests |
+| `npm run test:coverage` | Run tests with coverage report (services, repositories, API) |
 | `npm run lint` | Run ESLint |
 | `npm run migrate` | Run database migrations |
 
@@ -140,6 +141,16 @@ docker compose up --build
 ```
 
 The app now stays running even if Meta fails (`GET /health` works), but media sync will not run until the token is valid.
+
+---
+
+## CI
+
+GitHub Actions runs on push/PR to `main`:
+
+- `npm run lint`
+- `npm test` (with Postgres 14 service container)
+- `npm run test:coverage` (≥ 80% threshold on services, repositories, and API routes)
 
 ---
 

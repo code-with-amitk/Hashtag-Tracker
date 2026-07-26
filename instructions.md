@@ -124,7 +124,7 @@ These are **platform constraints** with the provided token, not bugs in the inge
 |----------|-------------|------------------------------|
 | **Mocked Meta in unit tests** | HTTP responses are stubbed; no live API in CI | Deterministic and fast. A staging smoke test against real Meta would run in a gated pipeline. |
 | **Integration tests need Postgres** | Jest `globalSetup` runs migrations against `TEST_DATABASE_URL` | Validates repositories and API against a real DB. CI would provision Postgres as a service container. |
-| **No ≥80% coverage gate in CI** | Tests exist across layers but no enforced coverage threshold in this repo | Phase 7 target; add `jest --coverage` to CI when ready. |
+| **Coverage gate in CI** | GitHub Actions runs `npm run test:coverage` with ≥ 80% threshold on services, repositories, and API routes | Enforced in `.github/workflows/ci.yml` and `jest.config.js`. |
 
 ### AI-assisted development
 
@@ -149,7 +149,8 @@ Architecture, scaffolding, and much of the implementation were written with **Cu
 
 - Reviewed all design decisions (dedup strategy, schema fields, module boundaries, pagination approach)
 - Verified environment variable names and defaults against requirements
-- Will implement, test, and validate all application code manually during Phases 0–7
+- Implemented, tested, and validated application code through Phases 0–7
+- Manual smoke tests against live Meta API (Docker); verified dedup and cron behavior
 
 ### Chat history from your AI sessions
 
@@ -159,5 +160,6 @@ All exported sessions are in the [`ai-usage/`](./ai-usage/) folder:
 |---------|------|
 | Design document | [`ai-usage/session-01-design.md`](./ai-usage/session-01-design.md) |
 | Instructions & AI usage setup | [`ai-usage/session-02-instructions-ai-usage.md`](./ai-usage/session-02-instructions-ai-usage.md) |
+| Implementation & Phase 7 polish | [`ai-usage/session-03-phase7-polish.md`](./ai-usage/session-03-phase7-polish.md) |
 | Raw transcript (JSONL) | [`ai-usage/917a1bf0-bcce-4b30-9ccc-b2874fbf2302.jsonl`](./ai-usage/917a1bf0-bcce-4b30-9ccc-b2874fbf2302.jsonl) |
 | Index | [`ai-usage/README.md`](./ai-usage/README.md) |

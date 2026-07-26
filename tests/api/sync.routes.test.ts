@@ -40,6 +40,7 @@ function buildDeps(options?: { hashtag?: Hashtag | null }) {
     storageBasePath: "./storage",
     port: 3000,
     syncMaxItems: 500,
+    metaPageLimit: 10,
     cronRecentMedia: "0 */3 * * *",
   };
 

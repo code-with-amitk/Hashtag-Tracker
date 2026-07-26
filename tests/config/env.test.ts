@@ -22,6 +22,7 @@ describe("loadConfig", () => {
     expect(config.storageBasePath).toBe("./storage");
     expect(config.port).toBe(3000);
     expect(config.syncMaxItems).toBe(500);
+    expect(config.metaPageLimit).toBe(10);
     expect(config.cronRecentMedia).toBe("0 */3 * * *");
   });
 
@@ -32,6 +33,7 @@ describe("loadConfig", () => {
       STORAGE_BASE_PATH: "/tmp/storage",
       PORT: "4000",
       SYNC_MAX_ITEMS: "100",
+      META_PAGE_LIMIT: "25",
       CRON_RECENT_MEDIA: "0 */1 * * *",
     });
 
@@ -39,6 +41,7 @@ describe("loadConfig", () => {
     expect(config.storageBasePath).toBe("/tmp/storage");
     expect(config.port).toBe(4000);
     expect(config.syncMaxItems).toBe(100);
+    expect(config.metaPageLimit).toBe(25);
     expect(config.cronRecentMedia).toBe("0 */1 * * *");
   });
 

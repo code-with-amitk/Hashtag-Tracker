@@ -514,15 +514,21 @@ Returns stored media for the tracked hashtag, newest first (`created_at DESC`).
 
 ### Phase 7 — Documentation & Polish
 
-- [ ] Fill `instructions.md` — setup, vars, tradeoffs
-- [ ] Update `README.md` with project overview
-- [ ] Manual smoke test against real Meta API
-- [ ] Verify dedup: run sync twice, confirm no duplicate rows
-- [ ] Verify cron fires (or trigger manually for demo)
+- [x] Fill `instructions.md` — setup, vars, tradeoffs
+- [x] Update `README.md` with project overview
+- [x] Manual smoke test against real Meta API
+- [x] Verify dedup: run sync twice, confirm no duplicate rows
+- [x] Verify cron fires (or trigger manually for demo)
 
 **Unit tests (Phase 7):**
-- [ ] Ensure CI script: `npm test` runs all unit tests
-- [ ] Target ≥ 80% coverage on services, repositories, and API routes
+- [x] Ensure CI script: `npm test` runs all unit tests (`.github/workflows/ci.yml`)
+- [x] Target ≥ 80% coverage on services, repositories, and API routes (`jest.config.js` thresholds + `npm run test:coverage` in CI)
+
+**Phase 7 verification notes:**
+- Smoke test: `GET /health`, `POST /sync/top`, `POST /sync/recent`, `GET /hashtags` verified against live Meta API via Docker
+- Dedup: `MediaRepository.upsert` integration test + re-sync produces `inserted: false`; no duplicate rows in DB
+- Cron: bootstrap unit test invokes registered callback → enqueues `SYNC_RECENT_HASHTAG_MEDIA`; manual demo via `POST /sync/recent`
+- AI sessions exported in `ai-usage/` (including session 3 summary)
 
 ---
 
