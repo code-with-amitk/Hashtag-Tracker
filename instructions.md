@@ -50,6 +50,7 @@ Environment variables used by the application. Copy `.env.example` to `.env` and
 | `STORAGE_BASE_PATH` | no | `./storage` | Local directory for downloaded media assets |
 | `PORT` | no | `3000` | HTTP port for the Express server |
 | `SYNC_MAX_ITEMS` | no | `500` | Max media items fetched per sync (Meta pagination cap) |
+| `META_PAGE_LIMIT` | no | `10` | Page size for `recent_media` requests (Meta rejects large `top_media` pages — see **tradeoffs**) |
 | `CRON_RECENT_MEDIA` | no | `0 */3 * * *` | Cron expression for recent-media sync (every 3 hours) |
 
 **Example `.env`:**
@@ -70,14 +71,64 @@ PORT=3000
 
 ## tradeoffs
 
-> Will be finalized after implementation. Planned shortcuts documented in [`design.md` Section 9](./design.md#9-tradeoffs--shortcuts-planned):
+Deliberate shortcuts and platform constraints for this assignment. A production system would address most of these.
 
-- In-memory queue (no persistence across restarts)
-- Local file storage instead of S3
-- No retry/backoff for Meta API rate limits
-- Single hashtag scope (`matcha`)
-- No authentication on the read API
-- Asset download inline during ingestion (not a separate async job queue)
+### Infrastructure & runtime
+
+| Decision | What we did | Why / production alternative |
+|----------|-------------|------------------------------|
+| **In-memory queue** | Jobs live in process memory; lost on restart | Simple and sufficient for the scope. Replace with SQS via `QueueInterface` for durability and horizontal scaling. |
+| **Local file storage** | Assets written to `STORAGE_BASE_PATH/{hashtag}/{mediaId}.{ext}` | Meets assignment requirements. Swap `LocalStorage` for S3 via `StorageInterface`. |
+| **In-process cron** | `node-cron` inside the app container | No OS crontab or separate scheduler container. Production would use EventBridge + Lambda or a dedicated worker service. |
+| **Single Node process** | API, queue worker, and scheduler run together | Keeps Docker setup minimal. Production would likely split API and workers (ECS/Fargate, Lambda). |
+| **No auth on API** | `GET /hashtags` and `POST /sync/*` are open | Assignment is an internal ingestion tool. Production would add API keys or OAuth. |
+
+### Ingestion & sync behavior
+
+| Decision | What we did | Why / production alternative |
+|----------|-------------|------------------------------|
+| **Single hashtag** | Only `#matcha` (configurable via `HASHTAG_NAME`, but not multi-tenant) | Matches requirements. Multi-hashtag would need per-hashtag sync state and API filtering. |
+| **Inline asset download** | Media files downloaded during the sync job, not enqueued separately | Simpler pipeline; sync duration includes download time. Production might use a dedicated asset queue with retries and CDN upload. |
+| **No Meta retry/backoff** | Failed API calls mark the `sync_run` as failed and log the error | Acceptable for a demo. Production would add exponential backoff, rate-limit awareness, and dead-letter handling. |
+| **Dedup via DB upsert** | Unique constraint on `instagram_media_id`; re-sync updates counts, skips re-insert | Simple and reliable. Does not re-download assets if already stored. |
+| **Manual sync endpoints** | `POST /sync/top` and `POST /sync/recent` for testing | Not required by spec; useful for demos without waiting for cron. Would be protected or removed in production. |
+| **Bootstrap enqueues top sync** | First top-media sync runs on app startup | Ensures data appears quickly after deploy. Production might rely on scheduled jobs only to avoid startup load. |
+
+### Meta Graph API limits (discovered during live testing)
+
+These are **platform constraints** with the provided token, not bugs in the ingestion code:
+
+| Constraint | Observed behavior | How we handle it |
+|------------|-------------------|------------------|
+| **`top_media` page size** | Requests with `limit ≥ 2` fail with *"Please reduce the amount of data you're asking for"* — even with `fields=id` only | `top_media` always uses `limit=1`. |
+| **`top_media` pagination** | Page 2+ fails (same error or *"An unknown error occurred"*) | Only the **first page** is ingested (~1 top item per sync). Cannot reach the assignment's 500-item cap for top media with this API tier. |
+| **`recent_media` page size** | Higher limits work (tested up to 25 with full fields) | Default `META_PAGE_LIMIT=10`; falls back to smaller field sets if Meta rejects the payload. |
+| **`recent_media` deep pagination** | Later pages can fail (rate limits or transient network errors) | Partial results are kept — sync completes with whatever was fetched before the failure. |
+| **Per-media enrichment** | `GET /{media-id}` fails with permission errors for hashtag-sourced IDs | We do not fetch media details in a second pass; all fields must come from the hashtag media list endpoint. |
+| **Token type matters** | App ID\|App Secret pairs fail with permission errors | Must use the Instagram **page access token** (`EAAM…`) from `requrirements.md`. |
+
+**Practical outcome:** a typical sync ingests **1 top item** and **up to ~40–500 recent items** (depending on Meta response and `SYNC_MAX_ITEMS`), not a full 500 for both endpoints.
+
+### Database & API design
+
+| Decision | What we did | Why / production alternative |
+|----------|-------------|------------------------------|
+| **Cursor pagination only** | `GET /hashtags` uses `cursor` + `limit`; no offset | Stable under concurrent inserts; better index use. Offset pagination is omitted intentionally. |
+| **Metadata field selection** | Store media ID, type, caption, URL, permalink, counts, timestamps, source, stored asset path | Balances assignment suggestions with what the API reliably returns. Caption may be omitted if Meta rejects large payloads (compact field fallback). |
+| **Sync run audit table** | `sync_runs` tracks status, counts, and errors per job | Useful for debugging; production would add metrics/alerting on top. |
+| **Migrations on startup** | Docker entrypoint runs `npm run migrate` before the app | Convenient for demos. Production often runs migrations as a separate deploy step. |
+
+### Testing & coverage
+
+| Decision | What we did | Why / production alternative |
+|----------|-------------|------------------------------|
+| **Mocked Meta in unit tests** | HTTP responses are stubbed; no live API in CI | Deterministic and fast. A staging smoke test against real Meta would run in a gated pipeline. |
+| **Integration tests need Postgres** | Jest `globalSetup` runs migrations against `TEST_DATABASE_URL` | Validates repositories and API against a real DB. CI would provision Postgres as a service container. |
+| **No ≥80% coverage gate in CI** | Tests exist across layers but no enforced coverage threshold in this repo | Phase 7 target; add `jest --coverage` to CI when ready. |
+
+### AI-assisted development
+
+Architecture, scaffolding, and much of the implementation were written with **Cursor** (see **ai-usage**). All design decisions, Meta API behavior, Docker setup, and test results were reviewed and validated manually against the running system.
 
 ---
 
